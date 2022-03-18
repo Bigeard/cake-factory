@@ -11,7 +11,7 @@ namespace CakeMachine.Fabrication.Opérations
         private readonly ushort _nombrePlaces;
         private readonly double _defectRate;
 
-        private readonly SemaphoreSlim _lock = new(1);
+        private readonly EngorgementProduction _lock = new(1);
 
         public Cuisson(ThreadSafeRandomNumberGenerator rng, ParamètresCuisson paramètres)
         {
@@ -40,7 +40,7 @@ namespace CakeMachine.Fabrication.Opérations
             try 
             {
                 VérifierNombreGâteaux(gâteaux);
-                Thread.Sleep(_tempsCuisson);
+                AttenteIncompressible.Attendre(_tempsCuisson);
                 return Factory(gâteaux);
             } 
             finally
@@ -56,7 +56,7 @@ namespace CakeMachine.Fabrication.Opérations
             try
             {
                 VérifierNombreGâteaux(gâteaux);
-                await Task.Delay(_tempsCuisson);
+                await AttenteIncompressible.AttendreAsync(_tempsCuisson);
                 return Factory(gâteaux);
             }
             finally

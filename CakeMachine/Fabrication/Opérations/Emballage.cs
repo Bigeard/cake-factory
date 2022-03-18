@@ -6,7 +6,7 @@ namespace CakeMachine.Fabrication.Opérations
 {
     public class Emballage
     {
-        private readonly SemaphoreSlim _lock;
+        private readonly EngorgementProduction _lock;
         private readonly TimeSpan _tempsEmballage;
         private readonly ThreadSafeRandomNumberGenerator _rng;
         private readonly double _defectRate;
@@ -14,14 +14,14 @@ namespace CakeMachine.Fabrication.Opérations
         public Emballage(ThreadSafeRandomNumberGenerator rng, ParamètresEmballage paramètres)
         {
             var (nombrePlaces, defectRate, tempsEmballage) = paramètres;
-            _lock = new SemaphoreSlim(nombrePlaces);
+            _lock = new EngorgementProduction(nombrePlaces);
             _tempsEmballage = tempsEmballage;
             _defectRate = defectRate;
 
             _rng = rng;
         }
 
-        public int PlacesRestantes => _lock.CurrentCount;
+        public int PlacesRestantes => _lock.PlacesRestantes;
 
         public GâteauEmballé Emballer(GâteauCuit gâteau)
         {
@@ -29,7 +29,7 @@ namespace CakeMachine.Fabrication.Opérations
 
             try
             {
-                Thread.Sleep(_tempsEmballage);
+                AttenteIncompressible.Attendre(_tempsEmballage);
                 return new GâteauEmballé(gâteau, _rng.NextBoolean(1 - _defectRate));
             }
             finally
@@ -44,7 +44,7 @@ namespace CakeMachine.Fabrication.Opérations
 
             try
             {
-                await Task.Delay(_tempsEmballage);
+                await AttenteIncompressible.AttendreAsync(_tempsEmballage);
                 return new GâteauEmballé(gâteau, _rng.NextBoolean(1 - _defectRate));
             }
             finally
