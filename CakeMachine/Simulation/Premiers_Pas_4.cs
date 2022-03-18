@@ -6,7 +6,7 @@ namespace CakeMachine.Simulation
     internal class Premiers_Pas_4 : Algorithme
     {
         /// <inheritdoc />
-        public override bool SupportsSync => true;
+        public override bool SupportsSync => false;
 
         /// <inheritdoc />
         public override IEnumerable<GâteauEmballé> Produire(Usine usine, CancellationToken token)

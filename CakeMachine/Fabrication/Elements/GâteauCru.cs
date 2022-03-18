@@ -1,6 +1,6 @@
 ﻿namespace CakeMachine.Fabrication.Elements
 {
-    internal class GâteauCru : IConforme
+    public class GâteauCru : IConforme
     {
         public GâteauCru(Plat plat, bool estCorrectementPréparé)
         {

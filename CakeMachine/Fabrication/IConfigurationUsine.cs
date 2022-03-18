@@ -1,6 +1,6 @@
 ﻿namespace CakeMachine.Fabrication
 {
-    internal interface IConfigurationUsine
+    public interface IConfigurationUsine
     {
         ushort TailleMaxUsine { get; }
 

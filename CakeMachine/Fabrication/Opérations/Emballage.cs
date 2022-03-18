@@ -4,7 +4,7 @@ using CakeMachine.Utils;
 
 namespace CakeMachine.Fabrication.Opérations
 {
-    internal class Emballage
+    public class Emballage
     {
         private readonly SemaphoreSlim _lock;
         private readonly TimeSpan _tempsEmballage;

@@ -1,6 +1,6 @@
 ﻿namespace CakeMachine.Utils
 {
-    internal class ThreadSafeRandomNumberGenerator
+    public class ThreadSafeRandomNumberGenerator
     {
         private readonly Random _random;
 

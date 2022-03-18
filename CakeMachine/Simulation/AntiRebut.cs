@@ -4,7 +4,7 @@ using CakeMachine.Fabrication.Elements;
 
 namespace CakeMachine.Simulation
 {
-    public class SingleThread : Algorithme
+    internal class AntiRebut : Algorithme
     {
         /// <inheritdoc />
         public override bool SupportsSync => false;
@@ -23,10 +23,16 @@ namespace CakeMachine.Simulation
             {
                 var plat = new Plat();
 
-                var gâteauCru = postePréparation.Préparer(plat);
-                var gâteauCuit = posteCuisson.Cuire(gâteauCru).Single();
-                var gâteauEmballé = posteEmballage.Emballer(gâteauCuit);
+                GâteauCru gâteauCru;
+                do gâteauCru = postePréparation.Préparer(plat);
+                while (!gâteauCru.EstConforme);
                 
+                var gâteauCuit = posteCuisson.Cuire(gâteauCru).Single();
+                if(!gâteauCuit.EstConforme) continue;
+
+                var gâteauEmballé = posteEmballage.Emballer(gâteauCuit);
+                if (!gâteauEmballé.EstConforme) continue;
+
                 yield return gâteauEmballé;
             }
         }
@@ -42,9 +48,15 @@ namespace CakeMachine.Simulation
             {
                 var plat = new Plat();
 
-                var gâteauCru = await postePréparation.PréparerAsync(plat);
+                GâteauCru gâteauCru;
+                do gâteauCru = await postePréparation.PréparerAsync(plat);
+                while (!gâteauCru.EstConforme);
+
                 var gâteauCuit = (await posteCuisson.CuireAsync(gâteauCru)).Single();
+                if (!gâteauCuit.EstConforme) continue;
+
                 var gâteauEmballé = await posteEmballage.EmballerAsync(gâteauCuit);
+                if (!gâteauEmballé.EstConforme) continue;
 
                 yield return gâteauEmballé;
             }

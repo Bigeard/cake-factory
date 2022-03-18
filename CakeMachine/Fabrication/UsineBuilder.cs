@@ -3,7 +3,7 @@ using CakeMachine.Utils;
 
 namespace CakeMachine.Fabrication
 {
-    internal class UsineBuilder : IConfigurationUsine
+    public class UsineBuilder : IConfigurationUsine
     {
         private ParamètresUsine _paramètres;
         private readonly ThreadSafeRandomNumberGenerator _rng = new ();

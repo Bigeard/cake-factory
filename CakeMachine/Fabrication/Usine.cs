@@ -4,7 +4,7 @@ using CakeMachine.Utils;
 
 namespace CakeMachine.Fabrication
 {
-    internal class Usine
+    public class Usine
     {
         public ParamètresUsine OrganisationUsine { get; }
         public const ushort TailleMaxUsine = 35;

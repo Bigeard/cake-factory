@@ -37,7 +37,11 @@ namespace CakeMachine.Utils
                     {
                         if (gâteau.EstConforme) gâteauxConformes++;
                     }
-                    
+
+                    if (!cancellationTokenSource.IsCancellationRequested)
+                        throw new Exception(
+                            $"L'algorithme {algorithme} n'a pas été capable de produire des gâteaux en continu suffisamment longtemps.");
+
                     résultats[algorithme][false] = gâteauxConformes;
                 }
 
@@ -50,6 +54,10 @@ namespace CakeMachine.Utils
                     {
                         if (gâteau.EstConforme) gâteauxConformes++;
                     }
+
+                    if(!cancellationTokenSource.IsCancellationRequested)
+                        throw new Exception(
+                            $"L'algorithme {algorithme} n'a pas été capable de produire des gâteaux en continu suffisamment longtemps.");
 
                     résultats[algorithme][true] = gâteauxConformes;
                 }
@@ -85,11 +93,21 @@ namespace CakeMachine.Utils
 
                     var gâteauxConformes = 0;
 
+                    var tokenSource = new CancellationTokenSource();
+                    using var producteur = algorithme.Produire(usine, tokenSource.Token).GetEnumerator();
+
                     while (gâteauxConformes < nombreGâteaux)
                     {
-                        var gâteaux = algorithme.Produire(nombreGâteaux, usine);
-                        gâteauxConformes += gâteaux.Count(gâteau => gâteau.EstConforme);
+                        if (!producteur.MoveNext())
+                            throw new Exception(
+                                $"L'algorithme {algorithme} n'a pas été capable de produire suffisamment de gâteaux.");
+
+                        Debug.Assert(producteur.Current != null, "producteur.Current != null");
+                        var gâteau = producteur.Current;
+                        if (gâteau.EstConforme) gâteauxConformes++;
                     }
+                    
+                    tokenSource.Cancel();
 
                     stopWatch.Stop();
 
@@ -103,12 +121,23 @@ namespace CakeMachine.Utils
 
                     var gâteauxConformes = 0;
 
+                    var tokenSource = new CancellationTokenSource();
+                    await using var producteur = algorithme
+                        .ProduireAsync(usine, tokenSource.Token)
+                        .GetAsyncEnumerator(tokenSource.Token);
+
                     while (gâteauxConformes < nombreGâteaux)
                     {
-                        var gâteaux = await algorithme.ProduireAsync(nombreGâteaux, usine).ToEnumerableAsync();
-                        gâteauxConformes += gâteaux.Count(gâteau => gâteau.EstConforme);
+                        if (!await producteur.MoveNextAsync())
+                            throw new Exception(
+                                $"L'algorithme {algorithme} n'a pas été capable de produire suffisamment de gâteaux.");
+
+                        var gâteau = producteur.Current;
+                        if (gâteau.EstConforme) gâteauxConformes++;
                     }
 
+                    tokenSource.Cancel();
+                    
                     stopWatch.Stop();
 
                     résultats[algorithme][true] = stopWatch.Elapsed;

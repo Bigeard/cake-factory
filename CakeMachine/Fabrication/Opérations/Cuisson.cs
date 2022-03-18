@@ -4,7 +4,7 @@ using CakeMachine.Utils;
 
 namespace CakeMachine.Fabrication.Opérations
 {
-    internal class Cuisson
+    public class Cuisson
     {
         private readonly ThreadSafeRandomNumberGenerator _rng;
         private readonly TimeSpan _tempsCuisson;

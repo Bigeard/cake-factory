@@ -3,7 +3,7 @@ using CakeMachine.Fabrication.Elements;
 
 namespace CakeMachine.Simulation
 {
-    internal abstract class Algorithme
+    public abstract class Algorithme
     {
         public virtual bool SupportsAsync => false;
         public virtual bool SupportsSync => false;
