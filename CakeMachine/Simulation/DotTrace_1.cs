@@ -7,16 +7,12 @@ using CakeMachine.Utils;
 
 namespace CakeMachine.Simulation
 {
-    internal class DotTrace1 : Algorithme
+    public class DotTrace_1 : Algorithme
     {
         /// <inheritdoc />
-
         public override bool SupportsAsync => true;
 
         /// <inheritdoc />
-
-        /// <inheritdoc />
-
         public override async IAsyncEnumerable<GâteauEmballé> ProduireAsync(Usine usine, [EnumeratorCancellation] CancellationToken token)
         {
             var capacitéFour = usine.OrganisationUsine.ParamètresCuisson.NombrePlaces;
@@ -27,7 +23,7 @@ namespace CakeMachine.Simulation
 
             while (!token.IsCancellationRequested)
             {
-                var plats = Enumerable.Range(0, 100).Select(_ => new Plat());
+                var plats = Enumerable.Range(0, 10).Select(_ => new Plat());
 
                 var gâteauxCrus = plats
                     .Select(postePréparation.PréparerAsync)
@@ -61,6 +57,28 @@ namespace CakeMachine.Simulation
                     yield return gâteauCuit;
 
                 buffer.Clear();
+            }
+        }
+        
+        private static async IAsyncEnumerable<GâteauCuit> TestCuireParLotsAsync(
+            IAsyncEnumerable<GâteauCru> gâteaux, 
+            Cuisson four,
+            uint capacitéFour)
+        {
+            var listGâteaux = await Task.WhenAll(gâteaux.ToEnumerableAsync());
+            var iteration = listGâteaux.First().Count() / capacitéFour;
+            for (int i = 0; i < iteration; i++)
+            {
+                var y = i * 5;
+                var gâteauxCuits = await four.CuireAsync(
+                    listGâteaux[y].First(), 
+                    listGâteaux[1 + y].First(), 
+                    listGâteaux[2 + y].First(), 
+                    listGâteaux[3 + y].First(), 
+                    listGâteaux[4 + y].First()
+                );
+                foreach (var gâteauCuit in gâteauxCuits)
+                    yield return gâteauCuit;
             }
         }
     }
