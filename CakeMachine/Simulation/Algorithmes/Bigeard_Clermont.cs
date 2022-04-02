@@ -10,54 +10,75 @@ namespace CakeMachine.Simulation.Algorithmes
     {
         /// <inheritdoc />
         public override bool SupportsAsync => true;
-        
+
+        /// <inheritdoc />
+        public override void ConfigurerUsine(IConfigurationUsine builder)
+        {
+            builder.NombrePréparateurs = 15;
+            builder.NombreFours = 13;
+            builder.NombreEmballeuses = 7;
+        }
+
         /// <inheritdoc />
         public override async IAsyncEnumerable<GâteauEmballé> ProduireAsync(
             Usine usine,
-            [EnumeratorCancellation] CancellationToken token)
+            [EnumeratorCancellation] CancellationToken token
+        )
         {
-            var capacitéFour = usine.OrganisationUsine.ParamètresCuisson.NombrePlaces;
-
-            var postePréparation = usine.Préparateurs.Single();
-            var posteEmballage = usine.Emballeuses.Single();
-            var posteCuisson = usine.Fours.Single();
+            var _préparatrices = new Ring<Préparation>(usine.Préparateurs);
+            var _fours = new Ring<Cuisson>(usine.Fours);
+            var _emballeuses = new Ring<Emballage>(usine.Emballeuses);
 
             while (!token.IsCancellationRequested)
             {
-                var plats = usine.StockInfiniPlats.Take(30);
+                // PREPARATION 15
+                // var gâteauParBoucle = usine.OrganisationUsine.NombrePréparateurs * usine.OrganisationUsine.ParamètresPréparation.NombrePlaces;
+                var gâteauCruTask = new List<Task<GâteauCru>>(usine.OrganisationUsine.NombrePréparateurs);
+                for (
+                    int i = 0;
+                    i < usine.OrganisationUsine.NombrePréparateurs;
+                    i++
+                )
+                {
+                    gâteauCruTask.Add(_préparatrices.Next.PréparerAsync(usine.StockInfiniPlats.First()));
+                }
+                var gâteauxCrus = await Task.WhenAll(gâteauCruTask);
 
-                var gâteauxCrus = plats
-                    .Select(postePréparation.PréparerAsync)
-                    .EnumerateCompleted();
+                // CUISSON 
+                var gâteauCuitTask = new List<Task<GâteauCuit[]>>(gâteauxCrus.Length);
+                for (
+                    int i = 0;
+                    i < gâteauxCrus.Length;
+                    i += 5
+                )
+                {
+                    gâteauCuitTask.Add(_fours.Next.CuireAsync(
+                        gâteauxCrus[i],
+                        gâteauxCrus[i + 1],
+                        gâteauxCrus[i + 2],
+                        gâteauxCrus[i + 3],
+                        gâteauxCrus[i + 4]
+                    ));
+                }
+                var gâteauxCuits = await Task.WhenAll(gâteauCuitTask);
 
-                var gâteauxCuits = CuireParLotsAsync(gâteauxCrus, posteCuisson, capacitéFour);
+                // EMBALLAGE 
+                var tâchesEmballage = new List<Task<GâteauEmballé>>(gâteauxCuits.Length);
 
-                var tâchesEmballage = new List<Task<GâteauEmballé>>();
-                await foreach (var gâteauCuit in gâteauxCuits.WithCancellation(token))
-                    tâchesEmballage.Add(posteEmballage.EmballerAsync(gâteauCuit));
-
+                for (
+                    int i = 0; 
+                    i < gâteauxCuits.Length; 
+                    i+=5
+                )
+                {
+                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][0]));
+                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][1]));
+                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][2]));
+                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][3]));
+                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][4]));
+                }
                 await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(token))
                     yield return gâteauEmballé;
-            }
-        }
-
-        private static async IAsyncEnumerable<GâteauCuit> CuireParLotsAsync(
-            IAsyncEnumerable<GâteauCru> gâteaux,
-            Cuisson four,
-            uint capacitéFour)
-        {
-            var buffer = new List<GâteauCru>((int)capacitéFour);
-            await foreach (var gâteauCru in gâteaux)
-            {
-                buffer.Add(gâteauCru);
-
-                if (buffer.Count != capacitéFour) continue;
-
-                var gâteauxCuits = await four.CuireAsync(buffer.ToArray());
-                foreach (var gâteauCuit in gâteauxCuits)
-                    yield return gâteauCuit;
-
-                buffer.Clear();
             }
         }
     }
