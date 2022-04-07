@@ -14,8 +14,8 @@ namespace CakeMachine.Simulation.Algorithmes
         /// <inheritdoc />
         public override void ConfigurerUsine(IConfigurationUsine builder)
         {
-            builder.NombrePréparateurs = 15;
-            builder.NombreFours = 13;
+            builder.NombrePréparateurs = 20;
+            builder.NombreFours = 8;
             builder.NombreEmballeuses = 7;
         }
 
@@ -40,7 +40,15 @@ namespace CakeMachine.Simulation.Algorithmes
                     i++
                 )
                 {
-                    gâteauCruTask.Add(_préparatrices.Next.PréparerAsync(usine.StockInfiniPlats.First()));
+                    var gâteauCru = usine.StockInfiniPlats.First();
+                    if (gâteauCru.EstConforme)
+                    {
+                        gâteauCruTask.Add(_préparatrices.Next.PréparerAsync(gâteauCru));
+                    }
+                    else
+                    {
+                        i--;
+                    }
                 }
                 var gâteauxCrus = await Task.WhenAll(gâteauCruTask);
 
@@ -52,13 +60,14 @@ namespace CakeMachine.Simulation.Algorithmes
                     i += 5
                 )
                 {
-                    gâteauCuitTask.Add(_fours.Next.CuireAsync(
+                    var gâteauCuit = _fours.Next.CuireAsync(
                         gâteauxCrus[i],
                         gâteauxCrus[i + 1],
                         gâteauxCrus[i + 2],
                         gâteauxCrus[i + 3],
                         gâteauxCrus[i + 4]
-                    ));
+                    );
+                    gâteauCuitTask.Add(gâteauCuit);
                 }
                 var gâteauxCuits = await Task.WhenAll(gâteauCuitTask);
 
@@ -66,9 +75,9 @@ namespace CakeMachine.Simulation.Algorithmes
                 var tâchesEmballage = new List<Task<GâteauEmballé>>(gâteauxCuits.Length);
 
                 for (
-                    int i = 0; 
-                    i < gâteauxCuits.Length; 
-                    i+=5
+                    int i = 0;
+                    i < gâteauxCuits.Length;
+                    i++
                 )
                 {
                     tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][0]));
