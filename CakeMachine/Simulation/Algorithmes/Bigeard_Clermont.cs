@@ -40,6 +40,8 @@ namespace CakeMachine.Simulation.Algorithmes
                     i++
                 )
                 {
+                    // token.ThrowIfCancellationRequested();
+
                     var gâteauCru = usine.StockInfiniPlats.First();
                     if (gâteauCru.EstConforme)
                     {
@@ -60,6 +62,8 @@ namespace CakeMachine.Simulation.Algorithmes
                     i += 5
                 )
                 {
+                    // token.ThrowIfCancellationRequested();
+
                     var gâteauCuit = _fours.Next.CuireAsync(
                         gâteauxCrus[i],
                         gâteauxCrus[i + 1],
@@ -80,11 +84,21 @@ namespace CakeMachine.Simulation.Algorithmes
                     i++
                 )
                 {
-                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][0]));
-                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][1]));
-                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][2]));
-                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][3]));
-                    tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][4]));
+                    // token.ThrowIfCancellationRequested();
+                    for (int j = 0; j < gâteauxCuits[i].Length; j++)
+                    {
+                        if (gâteauxCuits[i][j].EstConforme)
+                        {
+                            tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][j]));
+                        }
+                        else {
+
+                        }
+                    }
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][1]));
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][2]));
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][3]));
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][4]));
                 }
                 await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(token))
                     yield return gâteauEmballé;
