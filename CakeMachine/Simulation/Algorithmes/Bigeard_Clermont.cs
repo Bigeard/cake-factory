@@ -9,7 +9,7 @@ namespace CakeMachine.Simulation.Algorithmes
     internal class Bigeard_Clermont : Algorithme
     {
         /// <inheritdoc />
-        public override bool SupportsAsync => true;
+        public override bool SupportsAsync => false;
 
         /// <inheritdoc />
         public override void ConfigurerUsine(IConfigurationUsine builder)
@@ -31,6 +31,8 @@ namespace CakeMachine.Simulation.Algorithmes
 
             while (!token.IsCancellationRequested)
             {
+
+                // préparatrices les gateau qui ne sont pas conforme
                 // PREPARATION 15
                 // var gâteauParBoucle = usine.OrganisationUsine.NombrePréparateurs * usine.OrganisationUsine.ParamètresPréparation.NombrePlaces;
                 var gâteauCruTask = new List<Task<GâteauCru>>(usine.OrganisationUsine.NombrePréparateurs);
@@ -91,8 +93,9 @@ namespace CakeMachine.Simulation.Algorithmes
                         {
                             tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][j]));
                         }
-                        else {
-
+                        else
+                        {
+                            usine.MettreAuRebut(gâteauxCuits[i][j]);
                         }
                     }
                     // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][1]));

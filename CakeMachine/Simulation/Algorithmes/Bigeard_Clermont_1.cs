@@ -15,9 +15,9 @@ namespace CakeMachine.Simulation.Algorithmes
         /// <inheritdoc />
         public override void ConfigurerUsine(IConfigurationUsine builder)
         {
-            builder.NombrePréparateurs = 15;
-            builder.NombreFours = 10;
-            builder.NombreEmballeuses = 10;
+            builder.NombrePréparateurs = 11;
+            builder.NombreFours = 12;
+            builder.NombreEmballeuses = 12;
         }
 
         private class OrdreProduction
@@ -41,27 +41,35 @@ namespace CakeMachine.Simulation.Algorithmes
             {
                 while (!_token.IsCancellationRequested)
                 {
-                    var gâteauxCuits = ProduireEtCuireParBains(_usine.OrganisationUsine.ParamètresCuisson.NombrePlaces, 6);
-                    
+                    var gâteauxCuits = ProduireEtCuireParBains(_usine.OrganisationUsine.ParamètresCuisson.NombrePlaces, 10);
+
                     var tâchesEmballage = new List<Task<GâteauEmballé>>(
                         _usine.OrganisationUsine.ParamètresCuisson.NombrePlaces * _usine.OrganisationUsine.NombreFours
                     );
 
-                    await foreach (var gâteauCuit in gâteauxCuits.WithCancellation(_token)){
-                        if(!gâteauCuit.EstConforme){
+                    await foreach (var gâteauCuit in gâteauxCuits.WithCancellation(_token))
+                    {
+                        if (!gâteauCuit.EstConforme)
+                        {
                             _usine.MettreAuRebut(gâteauCuit);
-                        } else {
+                        }
+                        else
+                        {
                             tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauCuit));
                         }
                     }
 
-                    await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(_token)) {
-                        if(!gâteauEmballé.EstConforme) {
+                    await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(_token))
+                    {
+                        if (!gâteauEmballé.EstConforme)
+                        {
                             _usine.MettreAuRebut(gâteauEmballé);
-                        } else {
+                        }
+                        else
+                        {
                             yield return gâteauEmballé;
                         }
-                    }    
+                    }
                 }
             }
 
@@ -75,15 +83,20 @@ namespace CakeMachine.Simulation.Algorithmes
                 await foreach (var bainGâteauxCrus in gâteauxCrus.WithCancellation(_token))
                     tachesCuisson.Add(_fours.Next.CuireAsync(bainGâteauxCrus));
 
-                await foreach (var bainGâteauxCuits in tachesCuisson.EnumerateCompleted().WithCancellation(_token)){
-                    foreach (var gâteauCuit in bainGâteauxCuits){
-                        if(!gâteauCuit.EstConforme) {
+                await foreach (var bainGâteauxCuits in tachesCuisson.EnumerateCompleted().WithCancellation(_token))
+                {
+                    foreach (var gâteauCuit in bainGâteauxCuits)
+                    {
+                        if (!gâteauCuit.EstConforme)
+                        {
                             _usine.MettreAuRebut(gâteauCuit);
-                        } else {
+                        }
+                        else
+                        {
                             yield return gâteauCuit;
                         }
                     }
-                }         
+                }
             }
 
             private async IAsyncEnumerable<GâteauCru[]> PréparerConformesParBainAsync(
@@ -93,7 +106,7 @@ namespace CakeMachine.Simulation.Algorithmes
                 var gâteauxConformes = 0;
                 var gâteauxRatés = 0;
                 var gâteauxPrêts = new ConcurrentBag<GâteauCru>();
-                
+
                 async Task TakeNextAndSpawnChild(uint depth)
                 {
                     _token.ThrowIfCancellationRequested();
@@ -105,9 +118,20 @@ namespace CakeMachine.Simulation.Algorithmes
                         await Task.Delay(_usine.OrganisationUsine.ParamètresPréparation.TempsMin / 2, _token);
                     }
 
-                    if(gâteauxConformes == totalAPréparer) return;
-                    
+                    if (gâteauxConformes == totalAPréparer) return;
+
                     var préparatrice = _préparatrices.Next;
+                    for (int i = 0; i < 20; i++)
+                    {
+                        if (préparatrice.PlacesRestantes > 0)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            préparatrice = _préparatrices.Next;
+                        }
+                    }
 
                     var child = TakeNextAndSpawnChild(depth + 1);
                     await PréparerPlat(préparatrice);
@@ -124,11 +148,15 @@ namespace CakeMachine.Simulation.Algorithmes
                         gâteauxPrêts!.Add(gateau);
                         Interlocked.Increment(ref gâteauxConformes);
                     }
-                    else Interlocked.Increment(ref gâteauxRatés);
+                    else
+                    {
+                        _usine.MettreAuRebut(gateau);
+                        Interlocked.Increment(ref gâteauxRatés);
+                    };
                 }
 
                 var spawner = TakeNextAndSpawnChild(0);
-                
+
                 var buffer = new List<GâteauCru>(gâteauxParBain);
                 for (var i = 0; i < totalAPréparer; i++)
                 {
@@ -141,7 +169,7 @@ namespace CakeMachine.Simulation.Algorithmes
                         _token.ThrowIfCancellationRequested();
                         await Task.Delay(_usine.OrganisationUsine.ParamètresPréparation.TempsMin / 2, _token);
                     }
-                    
+
                     buffer.Add(gâteauPrêt);
 
                     if (buffer.Count != gâteauxParBain) continue;
