@@ -15,9 +15,9 @@ namespace CakeMachine.Simulation.Algorithmes
         /// <inheritdoc />
         public override void ConfigurerUsine(IConfigurationUsine builder)
         {
-            builder.NombrePréparateurs = 10;
-            builder.NombreFours = 6;
-            builder.NombreEmballeuses = 15;
+            builder.NombrePréparateurs = 15;
+            builder.NombreFours = 10;
+            builder.NombreEmballeuses = 10;
         }
 
         private class OrdreProduction
@@ -47,11 +47,21 @@ namespace CakeMachine.Simulation.Algorithmes
                         _usine.OrganisationUsine.ParamètresCuisson.NombrePlaces * _usine.OrganisationUsine.NombreFours
                     );
 
-                    await foreach (var gâteauCuit in gâteauxCuits.WithCancellation(_token))
-                        tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauCuit));
+                    await foreach (var gâteauCuit in gâteauxCuits.WithCancellation(_token)){
+                        if(!gâteauCuit.EstConforme){
+                            _usine.MettreAuRebut(gâteauCuit);
+                        } else {
+                            tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauCuit));
+                        }
+                    }
 
-                    await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(_token))
-                        yield return gâteauEmballé;
+                    await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(_token)) {
+                        if(!gâteauEmballé.EstConforme) {
+                            _usine.MettreAuRebut(gâteauEmballé);
+                        } else {
+                            yield return gâteauEmballé;
+                        }
+                    }    
                 }
             }
 
@@ -65,9 +75,15 @@ namespace CakeMachine.Simulation.Algorithmes
                 await foreach (var bainGâteauxCrus in gâteauxCrus.WithCancellation(_token))
                     tachesCuisson.Add(_fours.Next.CuireAsync(bainGâteauxCrus));
 
-                await foreach (var bainGâteauxCuits in tachesCuisson.EnumerateCompleted().WithCancellation(_token))
-                foreach (var gâteauCuit in bainGâteauxCuits)
-                    yield return gâteauCuit;
+                await foreach (var bainGâteauxCuits in tachesCuisson.EnumerateCompleted().WithCancellation(_token)){
+                    foreach (var gâteauCuit in bainGâteauxCuits){
+                        if(!gâteauCuit.EstConforme) {
+                            _usine.MettreAuRebut(gâteauCuit);
+                        } else {
+                            yield return gâteauCuit;
+                        }
+                    }
+                }         
             }
 
             private async IAsyncEnumerable<GâteauCru[]> PréparerConformesParBainAsync(
