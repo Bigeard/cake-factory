@@ -1,4 +1,3 @@
-﻿using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using CakeMachine.Fabrication.ContexteProduction;
 using CakeMachine.Fabrication.Elements;
@@ -7,190 +6,106 @@ using CakeMachine.Utils;
 
 namespace CakeMachine.Simulation.Algorithmes
 {
-    internal class BigeardClermont1 : Algorithme
+    internal class Bigeard_Clermont_1 : Algorithme
     {
         /// <inheritdoc />
-        public override bool SupportsAsync => true;
+        public override bool SupportsAsync => false;
 
         /// <inheritdoc />
         public override void ConfigurerUsine(IConfigurationUsine builder)
         {
-            builder.NombrePréparateurs = 11;
-            builder.NombreFours = 12;
-            builder.NombreEmballeuses = 12;
-        }
-
-        private class OrdreProduction
-        {
-            private readonly Usine _usine;
-            private readonly CancellationToken _token;
-            private readonly Ring<Emballage> _emballeuses;
-            private readonly Ring<Cuisson> _fours;
-            private readonly Ring<Préparation> _préparatrices;
-
-            public OrdreProduction(Usine usine, CancellationToken token)
-            {
-                _usine = usine;
-                _token = token;
-                _emballeuses = new Ring<Emballage>(usine.Emballeuses);
-                _fours = new Ring<Cuisson>(usine.Fours);
-                _préparatrices = new Ring<Préparation>(usine.Préparateurs);
-            }
-
-            public async IAsyncEnumerable<GâteauEmballé> ProduireAsync()
-            {
-                while (!_token.IsCancellationRequested)
-                {
-                    var gâteauxCuits = ProduireEtCuireParBains(_usine.OrganisationUsine.ParamètresCuisson.NombrePlaces, 10);
-
-                    var tâchesEmballage = new List<Task<GâteauEmballé>>(
-                        _usine.OrganisationUsine.ParamètresCuisson.NombrePlaces * _usine.OrganisationUsine.NombreFours
-                    );
-
-                    await foreach (var gâteauCuit in gâteauxCuits.WithCancellation(_token))
-                    {
-                        if (!gâteauCuit.EstConforme)
-                        {
-                            _usine.MettreAuRebut(gâteauCuit);
-                        }
-                        else
-                        {
-                            tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauCuit));
-                        }
-                    }
-
-                    await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(_token))
-                    {
-                        if (!gâteauEmballé.EstConforme)
-                        {
-                            _usine.MettreAuRebut(gâteauEmballé);
-                        }
-                        else
-                        {
-                            yield return gâteauEmballé;
-                        }
-                    }
-                }
-            }
-
-            private async IAsyncEnumerable<GâteauCuit> ProduireEtCuireParBains(
-                ushort nombrePlacesParFour,
-                ushort nombreBains)
-            {
-                var gâteauxCrus = PréparerConformesParBainAsync(nombrePlacesParFour, nombreBains);
-
-                var tachesCuisson = new List<Task<GâteauCuit[]>>();
-                await foreach (var bainGâteauxCrus in gâteauxCrus.WithCancellation(_token))
-                    tachesCuisson.Add(_fours.Next.CuireAsync(bainGâteauxCrus));
-
-                await foreach (var bainGâteauxCuits in tachesCuisson.EnumerateCompleted().WithCancellation(_token))
-                {
-                    foreach (var gâteauCuit in bainGâteauxCuits)
-                    {
-                        if (!gâteauCuit.EstConforme)
-                        {
-                            _usine.MettreAuRebut(gâteauCuit);
-                        }
-                        else
-                        {
-                            yield return gâteauCuit;
-                        }
-                    }
-                }
-            }
-
-            private async IAsyncEnumerable<GâteauCru[]> PréparerConformesParBainAsync(
-                ushort gâteauxParBain, ushort bains)
-            {
-                var totalAPréparer = (ushort)(bains * gâteauxParBain);
-                var gâteauxConformes = 0;
-                var gâteauxRatés = 0;
-                var gâteauxPrêts = new ConcurrentBag<GâteauCru>();
-
-                async Task TakeNextAndSpawnChild(uint depth)
-                {
-                    _token.ThrowIfCancellationRequested();
-                    // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-                    while (depth >= totalAPréparer + gâteauxRatés)
-                    {
-                        _token.ThrowIfCancellationRequested();
-                        if (gâteauxConformes == totalAPréparer) return;
-                        await Task.Delay(_usine.OrganisationUsine.ParamètresPréparation.TempsMin / 2, _token);
-                    }
-
-                    if (gâteauxConformes == totalAPréparer) return;
-
-                    var préparatrice = _préparatrices.Next;
-                    for (int i = 0; i < 20; i++)
-                    {
-                        if (préparatrice.PlacesRestantes > 0)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            préparatrice = _préparatrices.Next;
-                        }
-                    }
-
-                    var child = TakeNextAndSpawnChild(depth + 1);
-                    await PréparerPlat(préparatrice);
-                    await child;
-                }
-
-                async Task PréparerPlat(Préparation préparatrice)
-                {
-                    _token.ThrowIfCancellationRequested();
-
-                    var gateau = await préparatrice.PréparerAsync(_usine.StockInfiniPlats.First());
-                    if (gateau.EstConforme)
-                    {
-                        gâteauxPrêts!.Add(gateau);
-                        Interlocked.Increment(ref gâteauxConformes);
-                    }
-                    else
-                    {
-                        _usine.MettreAuRebut(gateau);
-                        Interlocked.Increment(ref gâteauxRatés);
-                    };
-                }
-
-                var spawner = TakeNextAndSpawnChild(0);
-
-                var buffer = new List<GâteauCru>(gâteauxParBain);
-                for (var i = 0; i < totalAPréparer; i++)
-                {
-                    _token.ThrowIfCancellationRequested();
-
-                    GâteauCru gâteauPrêt;
-
-                    while (!gâteauxPrêts.TryTake(out gâteauPrêt!))
-                    {
-                        _token.ThrowIfCancellationRequested();
-                        await Task.Delay(_usine.OrganisationUsine.ParamètresPréparation.TempsMin / 2, _token);
-                    }
-
-                    buffer.Add(gâteauPrêt);
-
-                    if (buffer.Count != gâteauxParBain) continue;
-
-                    yield return buffer.ToArray();
-
-                    buffer.Clear();
-                }
-
-                await spawner;
-            }
+            builder.NombrePréparateurs = 20;
+            builder.NombreFours = 8;
+            builder.NombreEmballeuses = 7;
         }
 
         /// <inheritdoc />
         public override async IAsyncEnumerable<GâteauEmballé> ProduireAsync(
             Usine usine,
-            [EnumeratorCancellation] CancellationToken token)
+            [EnumeratorCancellation] CancellationToken token
+        )
         {
-            var ligne = new OrdreProduction(usine, token);
-            await foreach (var gâteauEmballé in ligne.ProduireAsync().WithCancellation(token))
-                yield return gâteauEmballé;
+            var _préparatrices = new Ring<Préparation>(usine.Préparateurs);
+            var _fours = new Ring<Cuisson>(usine.Fours);
+            var _emballeuses = new Ring<Emballage>(usine.Emballeuses);
+
+            while (!token.IsCancellationRequested)
+            {
+
+                // préparatrices les gateau qui ne sont pas conforme
+                // PREPARATION 15
+                // var gâteauParBoucle = usine.OrganisationUsine.NombrePréparateurs * usine.OrganisationUsine.ParamètresPréparation.NombrePlaces;
+                var gâteauCruTask = new List<Task<GâteauCru>>(usine.OrganisationUsine.NombrePréparateurs);
+                for (
+                    int i = 0;
+                    i < usine.OrganisationUsine.NombrePréparateurs;
+                    i++
+                )
+                {
+                    // token.ThrowIfCancellationRequested();
+
+                    var gâteauCru = usine.StockInfiniPlats.First();
+                    if (gâteauCru.EstConforme)
+                    {
+                        gâteauCruTask.Add(_préparatrices.Next.PréparerAsync(gâteauCru));
+                    }
+                    else
+                    {
+                        i--;
+                    }
+                }
+                var gâteauxCrus = await Task.WhenAll(gâteauCruTask);
+
+                // CUISSON 
+                var gâteauCuitTask = new List<Task<GâteauCuit[]>>(gâteauxCrus.Length);
+                for (
+                    int i = 0;
+                    i < gâteauxCrus.Length;
+                    i += 5
+                )
+                {
+                    // token.ThrowIfCancellationRequested();
+
+                    var gâteauCuit = _fours.Next.CuireAsync(
+                        gâteauxCrus[i],
+                        gâteauxCrus[i + 1],
+                        gâteauxCrus[i + 2],
+                        gâteauxCrus[i + 3],
+                        gâteauxCrus[i + 4]
+                    );
+                    gâteauCuitTask.Add(gâteauCuit);
+                }
+                var gâteauxCuits = await Task.WhenAll(gâteauCuitTask);
+
+                // EMBALLAGE 
+                var tâchesEmballage = new List<Task<GâteauEmballé>>(gâteauxCuits.Length);
+
+                for (
+                    int i = 0;
+                    i < gâteauxCuits.Length;
+                    i++
+                )
+                {
+                    // token.ThrowIfCancellationRequested();
+                    for (int j = 0; j < gâteauxCuits[i].Length; j++)
+                    {
+                        if (gâteauxCuits[i][j].EstConforme)
+                        {
+                            tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][j]));
+                        }
+                        else
+                        {
+                            usine.MettreAuRebut(gâteauxCuits[i][j]);
+                        }
+                    }
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][1]));
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][2]));
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][3]));
+                    // tâchesEmballage.Add(_emballeuses.Next.EmballerAsync(gâteauxCuits[i][4]));
+                }
+                await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(token))
+                    yield return gâteauEmballé;
+            }
         }
     }
 }
